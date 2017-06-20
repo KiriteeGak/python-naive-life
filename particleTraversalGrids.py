@@ -64,19 +64,32 @@ def plotPoints(resource_locations, particle_locations):
 	plt.show()
 	
 def gossip(max_gossip_distance, settlers, resource_locations, particle_locations):
+	'''
+		
+	'''
 	p_received_gossip = {}
 	mod_settlers_by_resource = {}
+	'''
+		gives {resource_n : [particle_m,...,particle_n]}
+	'''
 	for k,v in settlers.iteritems():
 		if v not in mod_settlers_by_resource:
 			mod_settlers_by_resource[v] = []
 			mod_settlers_by_resource[v].append(k)
 			continue
 		mod_settlers_by_resource[v].append(k)
+	'''
+		Should output a map of resources and msg received particles
+	'''
+	ret = {}
 	for i, (resource_index, particles_allocated) in mod_settlers_by_resource.iteritems():
 		for j, (particle_index_dummy, current_location) in particle_locations.iteritems():
-			if (particle_index != particle_index_dummy) and \
+			if (particle_index not in particles_allocated) and \
 				distance(current_location, resource_locations[resource_allocated_to]):
-				pass
+					if particle_index_dummy not in ret:
+						ret[particle_index_dummy] = []
+					ret[particle_index_dummy].append(resource_index)
+	return ret
 
 def main(number_of_resources = 20, number_of_particles = 2):
 	iterations = 1
