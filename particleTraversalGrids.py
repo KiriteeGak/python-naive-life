@@ -12,7 +12,7 @@ def generateResourceCoordinates(number_of_resources=1):
         Args:
             number_of_resources (Int) : Number of resources to be generated on the map
         Returns:
-            dict : A dictionary with resource id and location
+            (dict) : A dictionary with resource id and location
     """
     if type(number_of_resources) == int:
         return {_ + 1: [float("%.2f" % rd.uniform(0, 1)), float("%.2f" % rd.uniform(0, 1))] for _ in
@@ -27,7 +27,7 @@ def generateCoordinates(number_of_particles=1, factor=1):
             number_of_particles (Int) : Number of coordinates to be generated for the particles
             factor (float) : To scale down/up the coordinates as the original grid is a unit sqaure plane
         Returns:
-            dict : Map of particle ids and coordinates
+            (dict) : Map of particle ids and coordinates
     """
     return {_ + 1: [float("%.2f" % rd.uniform(0, 1)) * factor, float("%.2f" % rd.uniform(0, 1)) * factor] for _ in
             range(number_of_particles)}
@@ -39,7 +39,7 @@ def generateVelocityVectors(number_of_particles=1, factor=0.5):
             number_of_particles (Int) : Number of velocity vectors to be generated for the particles
             factor (float) : To scale down/up the velocity vectors as the original grid is a unit sqaure plane
         Returns:
-            dict : Map of particle ids and velocity vectors
+            (dict) : Map of particle ids and velocity vectors
     """
     return {_ + 1: [float("%.2f" % rd.uniform(-0.5, 0.5)) * factor, float("%.2f" % rd.uniform(-0.5, 0.5)) * factor] for
             _ in
@@ -49,10 +49,10 @@ def generateVelocityVectors(number_of_particles=1, factor=0.5):
 def getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors):
     """
         Args:
-            coordinate_vectors (dict) : Map of particle ids and cooridinates
+            coordinate_vectors (dict) : Map of particle ids and coordinates
             velocity_vectors (dict) : Map of particle ids and velocity vectors
         Returns:
-            dict : Map of particle ids and velocity for the next time step
+            (dict) : Map of particle ids and velocity for the next time step
     """
     return {_ + 1: mod_vel for _, mod_vel in enumerate(_tackleOverTheGridCoords(
         [_createMutation(list(np.array(c) + np.array(v))) for c, v in
@@ -63,11 +63,11 @@ def remakeVelocityVectors(settlers, velocity_vectors):
     """
         Args:
             settlers (dict) : Map of particles that are settlers for a resource
-            velocity_vectors (dict) : Map of particle ids with velocity vectos
+            velocity_vectors (dict) : Map of particle ids with velocity vector
         Returns:
             (dict) : Map of updated velocity vecs. 
     """
-    return {particle: (np.array([0, 0]) if i in settlers else vel) for particle, vel in velocity_vectors.iteritems()}
+    return {particle: (np.array([0, 0]) if particle in settlers else vel) for particle, vel in velocity_vectors.iteritems()}
 
 
 def _createMutation(coordinates, probab=[0.01, 0.99]):
@@ -191,7 +191,7 @@ def getScoreBySignals(msgs_received, factor='exp'):
         Returns:
             (float) : Combined score for preference of resource
     """
-    assert (type(factor) in [str, float, int]), "Factor should be of format Int,Float or by default a string"
+    assert (type(factor) in [str, float, int]), "Factor should be of format int,float or by default a string"
     if factor == 'exp':
         return round(1 - (1 / np.exp(msgs_received)), 4)
     elif factor > 1:
