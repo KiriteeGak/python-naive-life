@@ -6,8 +6,9 @@ from commons import *
 max_grid_distance = np.sqrt(2)
 
 
-class constValueGenerators(object):
-    def generateResourceCoordinates(self, number_of_resources=1):
+class ConstValueGenerators():
+    @staticmethod
+    def generateResourceCoordinates(number_of_resources=1):
         """
             Args:
                 number_of_resources (Int) : Number of resources to be generated on the map
@@ -20,7 +21,8 @@ class constValueGenerators(object):
         else:
             raise TypeError("Number of resources should be of integer format")
 
-    def generateCoordinates(self, number_of_particles=1, factor=1):
+    @staticmethod
+    def generateCoordinates(number_of_particles=1, factor=1):
         """
             Args:
                 number_of_particles (Int) : Number of coordinates to be generated for the particles
@@ -28,13 +30,14 @@ class constValueGenerators(object):
             Returns:
                 (dict) : Map of particle ids and coordinates
         """
-        assert (type(number_of_particles) == int),"Format type of number of particles should be an integer"
-        assert (0<factor<=1),"factor value should range between zero and one"
-        assert (type(factor) in (float,int)),"factor value passed should be of type int"
+        assert (type(number_of_particles) == int), "Format type of number of particles should be an integer"
+        assert (0 < factor <= 1), "factor value should range between zero and one"
+        assert (type(factor) in (float, int)), "factor value passed should be of type int"
         return {_ + 1: [float("%.2f" % rd.uniform(0, 1)) * factor, float("%.2f" % rd.uniform(0, 1)) * factor] for _ in
                 range(number_of_particles)}
 
-    def generateVelocityVectors(self, number_of_particles=1, factor=0.5):
+    @staticmethod
+    def generateVelocityVectors(number_of_particles=1, factor=0.5):
         """
             Args:
                 number_of_particles (Int) : Number of velocity vectors to be generated for the particles
@@ -71,16 +74,18 @@ def remakeVelocityVectors(settlers, velocity_vectors):
             velocity_vectors.iteritems()}
 
 
-def _createMutation(coordinates, probab=[0.01, 0.99]):
+def _createMutation(coordinates, odds=None):
     """
         Args:
             coordinates (List) : List of coordinates for all the particles
-            probab (List) : Mutation rate
+            odds (List) : Mutation rate
         Returns:
             (List) : Mutated coordinate list
     """
-    assert (sum(probab) == 1), "Sum of probabilities does not add up to one"
-    if np.random.choice([True, False], p=probab):
+    if not odds:
+        odds = [0.01, 0.99]
+    assert (sum(odds) - 1 > 0.0001), "Sum of probabilities does not add up to one"
+    if np.random.choice([True, False], p=odds):
         return np.array(coordinates) + np.array([rd.uniform(-0.1, 0.1), rd.uniform(-0.1, 0.1)])
     else:
         return coordinates
@@ -108,9 +113,10 @@ def searchOrGetMessage(settlers, current_locations, resource_locations, iteratio
         Returns:
             NEED SOME SEEING
     """
-    all_resources_found_around = searchForResourceAround(current_locations, resource_locations, radius)
-    resources_found_by_message_received = getResourcesByGossip(iteration, settlers, 0.4, resource_locations, current_locations)
-    print "resources_found_by_message_received", resources_found_by_message_received
+    resources_in_view = searchForResourceAround(current_locations, resource_locations, radius)
+    resources_found_by_gossip = getResourcesByGossip(iteration, settlers, 0.4, resource_locations,
+                                                     current_locations)
+    print settleParticlesDown(settlers, iteration, resources_in_view, resources_found_by_gossip)
     exit()
 
 
@@ -130,9 +136,9 @@ def searchForResourceAround(current_locations, resource_locations, radius=0.2):
             if dist < radius:
                 if i not in found_locations_by_distance:
                     found_locations_by_distance[i] = []
-                    found_locations_by_distance[i].append([j, dist])
+                    found_locations_by_distance[i].append({j: dist})
                     continue
-                found_locations_by_distance[i].append([j, dist])
+                found_locations_by_distance[i].append({j: dist})
     return found_locations_by_distance
 
 
@@ -147,18 +153,19 @@ def getCombinedScore(iteration, dist, msgs_received, factor='exp'):
             (float) : Combined score for preference of resource
     """
     return round(
-        getScoreByNumberOfIterationsSpent(iteration) + getScoreByDistance(dist) + getScoreBySignals(msgs_received,
-                                                                                                    factor), 3)
+        getScoreByIterationsSpent(iteration) / (getScoreByDistance(dist) + getScoreBySignals(msgs_received,
+                                                                                             factor)), 3)
 
 
-def getScoreByNumberOfIterationsSpent(iteration):
+def getScoreByIterationsSpent(iteration, modifier=0.5):
     """
         Args:
             iteration (int) : Iteration the system currently in
+            modifier (int) : modifies selection criteria
         Returns:
             (float) : score based on iteration
     """
-    return round(float(np.log(1 + iteration) / np.log(2)), 3)
+    return round(float(iteration / (modifier + iteration)), 3)
 
 
 def getScoreByDistance(dist):
@@ -168,7 +175,7 @@ def getScoreByDistance(dist):
         Returns:
             (float) : Score based on distance
     """
-    return round(np.exp((max_grid_distance - dist) / max_grid_distance), 3)
+    return round(max_grid_distance / (dist + max_grid_distance), 3)
 
 
 def getScoreBySignals(msgs_received, factor='exp'):
@@ -200,6 +207,9 @@ def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_loca
         Returns:
             Note : SOME FUNCTIONS NEEDS TO BE ADDED
     """
+
+    # should return source map[(id -> [particle_ids])
+
     res_to_particles_settled_match = {}
     for particle_id, source_id in settlers.iteritems():
         if source_id not in res_to_particles_settled_match:
@@ -212,16 +222,49 @@ def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_loca
             for source, sour_loc in resource_locations.iteritems():
                 dist = distance(loc, sour_loc)
                 msgs_received = len(res_to_particles_settled_match.get(source, []))
-                if msgs_received !=0 and dist <= max_gossip_distance:
+                if msgs_received != 0 and dist <= max_gossip_distance:
                     ret[particle][source] = getCombinedScore(iteration, dist, msgs_received)
+                    ret[particle][source] = {
+                        'iteration_based_score': getScoreByIterationsSpent(iteration),
+                        'distance_based_score': getScoreByDistance(dist),
+                        'gossip_based_score': getScoreBySignals(msgs_received)
+                    }
     return ret
 
 
-def main(number_of_resources=5, number_of_particles=4):
+def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
+    ret = {}
+    for particle_id, resource_avail in view_radius_based.iteritems():
+        if particle_id not in settlers:
+            if len(gossip_based[particle_id]) == 0:
+                ret[particle_id] = getProbableSelections(resource_avail, iteration, mode='distance_based')
+            else:
+                ret[particle_id] = getProbableSelections(resources_avail, iteration, mode='message_based')
+    return ret
+
+
+def getProbableSelections(resources_avail, iteration, mode):
+    """
+        resources_avail (dict) : 
+        iteration (int) : 
+        mode (string) : 
+    """
+    if mode == 'distance_based':
+        unnormalized_scores = np.array(
+            [getScoreByDistance(e.values()[0]) * getScoreByIterationsSpent(iteration) for e in resources_avail],
+            dtype=float)
+    elif mode == 'message_based':
+        unnormalized_scores = [e for e in resources_avail]
+    normalised_scores = unnormalized_scores / np.sum(unnormalized_scores)
+    assert (sum(normalised_scores) - 1 <= 0), "Check the normalising function"
+    return np.random.choice([e.keys()[0] for e in resources_avail], p=normalised_scores)
+
+
+def main(number_of_resources=4, number_of_particles=10):
     iterations = 1
-    resource_vectors = constValueGenerators().generateResourceCoordinates(number_of_resources)
-    coordinate_vectors = constValueGenerators().generateCoordinates(number_of_particles)
-    velocity_vectors = constValueGenerators().generateVelocityVectors(number_of_particles)
+    resource_vectors = ConstValueGenerators.generateResourceCoordinates(number_of_resources)
+    coordinate_vectors = ConstValueGenerators.generateCoordinates(number_of_particles)
+    velocity_vectors = ConstValueGenerators.generateVelocityVectors(number_of_particles)
     settlers = {}
     while iterations <= 10:
         # plotPoints(resource_vectors.values(), coordinate_vectors.values())

@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 
 def distance(point1, point2):
 	return round(reduce(lambda a,b : a+b ,list(map(lambda x : x**2, list(np.array(point1)-np.array(point2))))),3)
