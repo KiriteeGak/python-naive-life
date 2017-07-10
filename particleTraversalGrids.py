@@ -59,7 +59,7 @@ def getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors):
     """
     return {_ + 1: mod_vel for _, mod_vel in enumerate(_tackleOverTheGridCoords(
         [_createMutation(list(np.array(c) + np.array(v))) for c, v in
-         (coordinate_vectors.values(), velocity_vectors.values())]))}
+         zip(coordinate_vectors.values(), velocity_vectors.values())]))}
 
 
 def remakeVelocityVectors(settlers, velocity_vectors):
@@ -84,7 +84,7 @@ def _createMutation(coordinates, odds=None):
     """
     if not odds:
         odds = [0.01, 0.99]
-    assert (sum(odds) - 1 > 0.0001), "Sum of probabilities does not add up to one"
+    assert (sum(odds) - 1 == 0), "Sum of probabilities does not add up to one"
     if np.random.choice([True, False], p=odds):
         return np.array(coordinates) + np.array([rd.uniform(-0.1, 0.1), rd.uniform(-0.1, 0.1)])
     else:
@@ -102,7 +102,7 @@ def _tackleOverTheGridCoords(list_of_coords):
             list_of_coords]
 
 
-def searchOrGetMessage(settlers, current_locations, resource_locations, iteration, radius=0.2):
+def searchOrGetMessage(settlers, current_locations, resource_locations, iteration, radius=0.02):
     """
         Args:
             settlers (dict) : Map of particle ids and the resources they got settled to, if any
@@ -114,10 +114,10 @@ def searchOrGetMessage(settlers, current_locations, resource_locations, iteratio
             NEED SOME SEEING
     """
     resources_in_view = searchForResourceAround(current_locations, resource_locations, radius)
-    resources_found_by_gossip = getResourcesByGossip(iteration, settlers, 0.4, resource_locations,
+    resources_found_by_gossip = getResourcesByGossip(iteration, settlers, 0.05, resource_locations,
                                                      current_locations)
-    print settleParticlesDown(settlers, iteration, resources_in_view, resources_found_by_gossip)
-    exit()
+    settlers = settleParticlesDown(settlers, iteration, resources_in_view, resources_found_by_gossip)
+    return settlers
 
 
 def searchForResourceAround(current_locations, resource_locations, radius=0.2):
@@ -178,7 +178,7 @@ def getScoreByDistance(dist):
     return round(max_grid_distance / (dist + max_grid_distance), 3)
 
 
-def getScoreBySignals(msgs_received, factor='exp'):
+def getScoreBySignals(msgs_received, factor=None):
     """
         Args:
             msgs_received : the number of particles the are settled to this
@@ -186,8 +186,9 @@ def getScoreBySignals(msgs_received, factor='exp'):
         Returns:
             (float) : Combined score for preference of resource
     """
-    assert (type(factor) in [str, float, int]), "Factor should be of format int,float or by default a string"
-    if factor == 'exp':
+    if factor:
+        assert (type(factor) in [str, float, int]), "Factor should be of format int,float or by default a string"
+    if not factor:
         return round(1 - (1 / np.exp(msgs_received)), 4)
     elif factor > 1:
         return round(1 - (1 / factor ** msgs_received), 4)
@@ -223,7 +224,6 @@ def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_loca
                 dist = distance(loc, sour_loc)
                 msgs_received = len(res_to_particles_settled_match.get(source, []))
                 if msgs_received != 0 and dist <= max_gossip_distance:
-                    ret[particle][source] = getCombinedScore(iteration, dist, msgs_received)
                     ret[particle][source] = {
                         'iteration_based_score': getScoreByIterationsSpent(iteration),
                         'distance_based_score': getScoreByDistance(dist),
@@ -237,13 +237,14 @@ def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
     for particle_id, resource_avail in view_radius_based.iteritems():
         if particle_id not in settlers:
             if len(gossip_based[particle_id]) == 0:
-                ret[particle_id] = getProbableSelections(resource_avail, iteration, mode='distance_based')
+                ret[particle_id] = getProbableSelections(resource_avail, iteration, None, mode='distance_based')
             else:
-                ret[particle_id] = getProbableSelections(resources_avail, iteration, mode='message_based')
+                ret[particle_id] = getProbableSelections(resource_avail, iteration, gossip_based[particle_id],
+                                                         mode='message_based')
     return ret
 
 
-def getProbableSelections(resources_avail, iteration, mode):
+def getProbableSelections(resources_avail, iteration, resources_found_by_gossip, mode):
     """
         resources_avail (dict) : 
         iteration (int) : 
@@ -253,10 +254,10 @@ def getProbableSelections(resources_avail, iteration, mode):
         unnormalized_scores = np.array(
             [getScoreByDistance(e.values()[0]) * getScoreByIterationsSpent(iteration) for e in resources_avail],
             dtype=float)
-    elif mode == 'message_based':
-        unnormalized_scores = [e for e in resources_avail]
+    else:
+        unnormalized_scores = np.array([e for e in resources_avail.itervalues()])
     normalised_scores = unnormalized_scores / np.sum(unnormalized_scores)
-    assert (sum(normalised_scores) - 1 <= 0), "Check the normalising function"
+    assert (sum(normalised_scores) - 1 <= 0.001), "Check the normalising function"
     return np.random.choice([e.keys()[0] for e in resources_avail], p=normalised_scores)
 
 
@@ -267,7 +268,7 @@ def main(number_of_resources=4, number_of_particles=10):
     velocity_vectors = ConstValueGenerators.generateVelocityVectors(number_of_particles)
     settlers = {}
     while iterations <= 10:
-        # plotPoints(resource_vectors.values(), coordinate_vectors.values())
+        plotPoints(resource_vectors.values(), coordinate_vectors.values())
         settlers = searchOrGetMessage(settlers, coordinate_vectors, resource_vectors, iterations)
         velocity_vectors = remakeVelocityVectors(settlers, velocity_vectors)
         coordinate_vectors = getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors)
