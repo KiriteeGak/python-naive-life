@@ -1,6 +1,7 @@
 import random as rd
 from matplotlib import pyplot as plt
 from itertools import *
+from requests.models import *
 from commons import *
 
 max_grid_distance = np.sqrt(2)
@@ -10,9 +11,9 @@ class ConstValueGenerators():
     @staticmethod
     def generateResourceCoordinates(number_of_resources=1):
         """
-            Args:
+            :argument
                 number_of_resources (Int) : Number of resources to be generated on the map
-            Returns:
+            :returns
                 (dict) : A dictionary with resource id and location
         """
         if type(number_of_resources) == int:
@@ -24,10 +25,10 @@ class ConstValueGenerators():
     @staticmethod
     def generateCoordinates(number_of_particles=1, factor=1):
         """
-            Args:
+            :argument
                 number_of_particles (Int) : Number of coordinates to be generated for the particles
                 factor (float) : To scale down/up the coordinates as the original grid is a unit square plane
-            Returns:
+            :returns
                 (dict) : Map of particle ids and coordinates
         """
         assert (type(number_of_particles) == int), "Format type of number of particles should be an integer"
@@ -39,10 +40,10 @@ class ConstValueGenerators():
     @staticmethod
     def generateVelocityVectors(number_of_particles=1, factor=0.5):
         """
-            Args:
+            :argument
                 number_of_particles (Int) : Number of velocity vectors to be generated for the particles
                 factor (float) : To scale down/up the velocity vectors as the original grid is a unit square plane
-            Returns:
+            :returns
                 (dict) : Map of particle ids and velocity vectors
         """
         return {_ + 1: [float("%.2f" % rd.uniform(-0.5, 0.5)) * factor, float("%.2f" % rd.uniform(-0.5, 0.5)) * factor]
@@ -51,10 +52,10 @@ class ConstValueGenerators():
 
 def getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors):
     """
-        Args:
+        :argument
             coordinate_vectors (dict) : Map of particle ids and coordinates
             velocity_vectors (dict) : Map of particle ids and velocity vectors
-        Returns:
+        :returns
             (dict) : Map of particle ids and velocity for the next time step
     """
     return {_ + 1: mod_vel for _, mod_vel in enumerate(_tackleOverTheGridCoords(
@@ -64,10 +65,10 @@ def getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors):
 
 def remakeVelocityVectors(settlers, velocity_vectors):
     """
-        Args:
+        :argument
             settlers (dict) : Map of particles that are settlers for a resource
             velocity_vectors (dict) : Map of particle ids with velocity vector
-        Returns:
+        :returns
             (dict) : Map of updated velocity vectors.
     """
     return {particle: (np.array([0, 0]) if particle in settlers else vel) for particle, vel in
@@ -76,10 +77,10 @@ def remakeVelocityVectors(settlers, velocity_vectors):
 
 def _createMutation(coordinates, odds=None):
     """
-        Args:
+        :argument
             coordinates (List) : List of coordinates for all the particles
             odds (List) : Mutation rate
-        Returns:
+        :returns
             (List) : Mutated coordinate list
     """
     if not odds:
@@ -95,7 +96,7 @@ def _tackleOverTheGridCoords(list_of_coords):
     """
         Args :
             list_of_coords (List) : List of coordinates
-        Returns:
+        :returns
             (List) : List of coordinates making sure that are in the grid
     """
     return [[rd.uniform(0, 1), rd.uniform(0, 1)] if (not (0 < x < 1) or not (0 < y < 1)) else [x, y] for x, y in
@@ -104,13 +105,13 @@ def _tackleOverTheGridCoords(list_of_coords):
 
 def searchOrGetMessage(settlers, current_locations, resource_locations, iteration, radius=0.02):
     """
-        Args:
+        :argument
             settlers (dict) : Map of particle ids and the resources they got settled to, if any
             current_locations (dict) : Map of current locations of all the particles
             resource_locations (dict) : Map of resource locations dropped on the map
             iteration (int) :  Current generation the system is in
             radius (float) : The maximum distance to for a particle to find a resource around it
-        Returns:
+        :returns
             NEED SOME SEEING
     """
     resources_in_view = searchForResourceAround(current_locations, resource_locations, radius)
@@ -126,7 +127,7 @@ def searchForResourceAround(current_locations, resource_locations, radius=0.2):
             current_locations (dict) : Map of current locations of all the particles
             resource_locations (dict) : Map of resource locations dropped on the map
             radius (float) : The maximum distance to for a particle to find a resource around it
-        Returns:
+        :returns
             (dict) : Map of particle ids and resources it has found around
     """
     found_locations_by_distance = {}
@@ -144,12 +145,12 @@ def searchForResourceAround(current_locations, resource_locations, radius=0.2):
 
 def getCombinedScore(iteration, dist, msgs_received, factor='exp'):
     """
-        Args:
+        :argument
             iteration (Int) : Iteration the system currently in
             dist (Int) : distance between particle and resource
             msgs_received : the number of particles the are settled to this
             factor (default : str; int): tune in for the probability of selection of source based on the msgs_received
-        Returns:
+        :returns
             (float) : Combined score for preference of resource
     """
     return round(
@@ -159,10 +160,10 @@ def getCombinedScore(iteration, dist, msgs_received, factor='exp'):
 
 def getScoreByIterationsSpent(iteration, modifier=0.5):
     """
-        Args:
+        :argument
             iteration (int) : Iteration the system currently in
             modifier (int) : modifies selection criteria
-        Returns:
+        :returns
             (float) : score based on iteration
     """
     return round(float(iteration / (modifier + iteration)), 3)
@@ -170,9 +171,9 @@ def getScoreByIterationsSpent(iteration, modifier=0.5):
 
 def getScoreByDistance(dist):
     """
-        Args:
+        :argument
             dist (Int) : distance between particle and resource
-        Returns:
+        :returns
             (float) : Score based on distance
     """
     return round(max_grid_distance / (dist + max_grid_distance), 3)
@@ -180,10 +181,10 @@ def getScoreByDistance(dist):
 
 def getScoreBySignals(msgs_received, factor=None):
     """
-        Args:
+        :argument
             msgs_received : the number of particles the are settled to this
             factor (default : str; int): tune in for the probability of selection of source based on the msgs_received
-        Returns:
+        :returns
             (float) : Combined score for preference of resource
     """
     if factor:
@@ -198,18 +199,16 @@ def getScoreBySignals(msgs_received, factor=None):
 
 def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_locations, particle_locations):
     """
-        Args:
+        :argument
             iteration (Int) : Current generation the system is in
             max_gossip_distance (float) : A particle sends a gossip around a radius of max_gossip_distance
             settlers (dict) : Map with resource number and list of particles that are settled for this
-            resource_locations : Map with resource number and the location of it on the map at curr. iteration
-            particle_locations : Map with particle index and the current location of particles
+            resource_locations (dict) : Map with resource number and the location of it on the map at curr. iteration
+            particle_locations (dict) : Map with particle index and the current location of particles
 
-        Returns:
-            Note : SOME FUNCTIONS NEEDS TO BE ADDED
+        :returns
+            ret (dict) : Map of particle as keys and resources (map) and their corresponding scores
     """
-
-    # should return source map[(id -> [particle_ids])
 
     res_to_particles_settled_match = {}
     for particle_id, source_id in settlers.iteritems():
@@ -233,6 +232,15 @@ def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_loca
 
 
 def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
+    """
+    :argument
+        settlers : (dict) A map of settled particles to the resource it got settled to
+        iteration: (int) The current iteration the system is in
+        view_radius_based: (dict) Resources found based on the view radius
+        gossip_based: (dict) Resources found on the basis of gossip radius
+    :returns
+        ret : (dict) Map of particle ids and resources they decided to settle to.
+    """
     ret = {}
     for particle_id, resource_avail in view_radius_based.iteritems():
         if particle_id not in settlers:
@@ -246,9 +254,13 @@ def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
 
 def getProbableSelections(resources_avail, iteration, resources_found_by_gossip, mode):
     """
-        resources_avail (dict) : 
-        iteration (int) : 
-        mode (string) : 
+        :argument
+            resources_avail (dict) :
+            iteration (int) :
+            resources_found_by_gossip (dict) :
+            mode (string) :
+        ::returns
+            A random choice based on the distribution calculated by normalized scores
     """
     if mode == 'distance_based':
         unnormalized_scores = np.array(
@@ -262,6 +274,11 @@ def getProbableSelections(resources_avail, iteration, resources_found_by_gossip,
 
 
 def main(number_of_resources=4, number_of_particles=10):
+    """Main function that runs simulations
+        :argument
+            number_of_resources: (int) Number of resources to be placed in the grid
+            number_of_particles: (int) Number of particles to be generated on the grid
+    """
     iterations = 1
     resource_vectors = ConstValueGenerators.generateResourceCoordinates(number_of_resources)
     coordinate_vectors = ConstValueGenerators.generateCoordinates(number_of_particles)
