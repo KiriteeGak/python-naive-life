@@ -4,10 +4,10 @@ from itertools import *
 from requests.models import *
 from commons import *
 
-max_grid_distance = np.sqrt(2)
+MAX_GRID_DISTANCE = np.sqrt(2)
 
 
-class ConstValueGenerators():
+class ConstValueGenerators:
     @staticmethod
     def generateResourceCoordinates(number_of_resources=1):
         """
@@ -50,57 +50,58 @@ class ConstValueGenerators():
                 for _ in range(number_of_particles)}
 
 
-def getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors):
-    """
-        :argument
-            coordinate_vectors (dict) : Map of particle ids and coordinates
-            velocity_vectors (dict) : Map of particle ids and velocity vectors
-        :returns
-            (dict) : Map of particle ids and velocity for the next time step
-    """
-    return {_ + 1: mod_vel for _, mod_vel in enumerate(_tackleOverTheGridCoords(
-        [_createMutation(list(np.array(c) + np.array(v))) for c, v in
-         zip(coordinate_vectors.values(), velocity_vectors.values())]))}
+class IterationValueGenerators:
+    def getNextTimeStepCoordinates(self, coordinate_vectors, velocity_vectors):
+        """
+            :argument
+                coordinate_vectors (dict) : Map of particle ids and coordinates
+                velocity_vectors (dict) : Map of particle ids and velocity vectors
+            :returns
+                (dict) : Map of particle ids and velocity for the next time step
+        """
+        return {_ + 1: mod_vel for _, mod_vel in enumerate(self._tackleOverTheGridCoords(
+            [self._createMutation(list(np.array(c) + np.array(v))) for c, v in
+             zip(coordinate_vectors.values(), velocity_vectors.values())]))}
 
+    @staticmethod
+    def remakeVelocityVectors(settlers, velocity_vectors):
+        """
+            :argument
+                settlers (dict) : Map of particles that are settlers for a resource
+                velocity_vectors (dict) : Map of particle ids with velocity vector
+            :returns
+                (dict) : Map of updated velocity vectors.
+        """
+        return {particle: (np.array([0, 0]) if particle in settlers else vel) for particle, vel in
+                velocity_vectors.iteritems()}
 
-def remakeVelocityVectors(settlers, velocity_vectors):
-    """
-        :argument
-            settlers (dict) : Map of particles that are settlers for a resource
-            velocity_vectors (dict) : Map of particle ids with velocity vector
-        :returns
-            (dict) : Map of updated velocity vectors.
-    """
-    return {particle: (np.array([0, 0]) if particle in settlers else vel) for particle, vel in
-            velocity_vectors.iteritems()}
+    @staticmethod
+    def _createMutation(coordinates, odds=None):
+        """
+            :argument
+                coordinates (List) : List of coordinates for all the particles
+                odds (List) : Mutation rate
+            :returns
+                (List) : Mutated coordinate list
+        """
+        if not odds:
+            odds = [0.01, 0.99]
+        assert (sum(odds) - 1 < 0.0001), "Sum of probabilities does not add up to one"
+        if np.random.choice([True, False], p=odds):
+            return np.array(coordinates) + np.array([rd.uniform(-0.1, 0.1), rd.uniform(-0.1, 0.1)])
+        else:
+            return coordinates
 
-
-def _createMutation(coordinates, odds=None):
-    """
-        :argument
-            coordinates (List) : List of coordinates for all the particles
-            odds (List) : Mutation rate
-        :returns
-            (List) : Mutated coordinate list
-    """
-    if not odds:
-        odds = [0.01, 0.99]
-    assert (sum(odds) - 1 == 0), "Sum of probabilities does not add up to one"
-    if np.random.choice([True, False], p=odds):
-        return np.array(coordinates) + np.array([rd.uniform(-0.1, 0.1), rd.uniform(-0.1, 0.1)])
-    else:
-        return coordinates
-
-
-def _tackleOverTheGridCoords(list_of_coords):
-    """
-        Args :
-            list_of_coords (List) : List of coordinates
-        :returns
-            (List) : List of coordinates making sure that are in the grid
-    """
-    return [[rd.uniform(0, 1), rd.uniform(0, 1)] if (not (0 < x < 1) or not (0 < y < 1)) else [x, y] for x, y in
-            list_of_coords]
+    @staticmethod
+    def _tackleOverTheGridCoords(list_of_coords):
+        """
+            :argument :
+                list_of_coords (List) : List of coordinates
+            :returns
+                (List) : List of coordinates making sure that are in the grid
+        """
+        return [[rd.uniform(0, 1), rd.uniform(0, 1)] if (not (0 < x < 1) or not (0 < y < 1)) else [x, y] for x, y in
+                list_of_coords]
 
 
 def searchOrGetMessage(settlers, current_locations, resource_locations, iteration, radius=0.02):
@@ -123,7 +124,7 @@ def searchOrGetMessage(settlers, current_locations, resource_locations, iteratio
 
 def searchForResourceAround(current_locations, resource_locations, radius=0.2):
     """
-        Args : 
+        :argument
             current_locations (dict) : Map of current locations of all the particles
             resource_locations (dict) : Map of resource locations dropped on the map
             radius (float) : The maximum distance to for a particle to find a resource around it
@@ -176,7 +177,7 @@ def getScoreByDistance(dist):
         :returns
             (float) : Score based on distance
     """
-    return round(max_grid_distance / (dist + max_grid_distance), 3)
+    return round(MAX_GRID_DISTANCE / (dist + MAX_GRID_DISTANCE), 3)
 
 
 def getScoreBySignals(msgs_received, factor=None):
@@ -205,7 +206,6 @@ def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_loca
             settlers (dict) : Map with resource number and list of particles that are settled for this
             resource_locations (dict) : Map with resource number and the location of it on the map at curr. iteration
             particle_locations (dict) : Map with particle index and the current location of particles
-
         :returns
             ret (dict) : Map of particle as keys and resources (map) and their corresponding scores
     """
@@ -247,6 +247,9 @@ def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
             if len(gossip_based[particle_id]) == 0:
                 ret[particle_id] = getProbableSelections(resource_avail, iteration, None, mode='distance_based')
             else:
+                print particle_id, resource_avail
+                print gossip_based[particle_id]
+                exit()
                 ret[particle_id] = getProbableSelections(resource_avail, iteration, gossip_based[particle_id],
                                                          mode='message_based')
     return ret
@@ -256,21 +259,27 @@ def getProbableSelections(resources_avail, iteration, resources_found_by_gossip,
     """
         :argument
             resources_avail (dict) :
-            iteration (int) :
-            resources_found_by_gossip (dict) :
-            mode (string) :
-        ::returns
+            iteration (int) : Current generation the system is in
+            resources_found_by_gossip (dict) : Resources a particle has found with scores for each resource
+            mode (string) : The mode in which the messaging system currently in
+        :returns
             A random choice based on the distribution calculated by normalized scores
     """
     if mode == 'distance_based':
         unnormalized_scores = np.array(
             [getScoreByDistance(e.values()[0]) * getScoreByIterationsSpent(iteration) for e in resources_avail],
             dtype=float)
+        normalised_scores = unnormalized_scores / np.sum(unnormalized_scores)
+        return np.random.choice([e.keys()[0] for e in resources_avail], p=normalised_scores)
     else:
-        unnormalized_scores = np.array([e for e in resources_avail.itervalues()])
-    normalised_scores = unnormalized_scores / np.sum(unnormalized_scores)
-    assert (sum(normalised_scores) - 1 <= 0.001), "Check the normalising function"
-    return np.random.choice([e.keys()[0] for e in resources_avail], p=normalised_scores)
+        resource_ids_in_view = list(set([e.keys()[0] for e in resources_avail] + resources_found_by_gossip.keys()))
+        resources_and_scores = {}
+        for res_id, scores_dict in resources_found_by_gossip.iteritems():
+            if res_id not in resource_ids_in_view:
+                resources_and_scores[res_id] = scores_dict['distance_based_score']*scores_dict['iteration_based_score']*scores_dict['gossip_based_score']
+            else:
+                resources_and_scores[res_id] = scores_dict['distance_based_score']*scores_dict['iteration_based_score']*scores_dict['gossip_based_score']
+                pass
 
 
 def main(number_of_resources=4, number_of_particles=10):
@@ -285,10 +294,10 @@ def main(number_of_resources=4, number_of_particles=10):
     velocity_vectors = ConstValueGenerators.generateVelocityVectors(number_of_particles)
     settlers = {}
     while iterations <= 10:
-        plotPoints(resource_vectors.values(), coordinate_vectors.values())
+        # plotPoints(resource_vectors.values(), coordinate_vectors.values())
         settlers = searchOrGetMessage(settlers, coordinate_vectors, resource_vectors, iterations)
-        velocity_vectors = remakeVelocityVectors(settlers, velocity_vectors)
-        coordinate_vectors = getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors)
+        velocity_vectors = IterationValueGenerators.remakeVelocityVectors(settlers, velocity_vectors)
+        coordinate_vectors = IterationValueGenerators().getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors)
         iterations += 1
 
 
