@@ -86,7 +86,7 @@ class IterationValueGenerators:
         """
         if not odds:
             odds = [0.01, 0.99]
-        assert (sum(odds) - 1 < 0.0001), "Sum of probabilities does not add up to one"
+        assert (sum(odds) - 1.0 < 0.0001), "Sum of probabilities does not add up to one"
         if np.random.choice([True, False], p=odds):
             return np.array(coordinates) + np.array([rd.uniform(-0.1, 0.1), rd.uniform(-0.1, 0.1)])
         else:
@@ -247,9 +247,6 @@ def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
             if len(gossip_based[particle_id]) == 0:
                 ret[particle_id] = getProbableSelections(resource_avail, iteration, None, mode='distance_based')
             else:
-                print particle_id, resource_avail
-                print gossip_based[particle_id]
-                exit()
                 ret[particle_id] = getProbableSelections(resource_avail, iteration, gossip_based[particle_id],
                                                          mode='message_based')
     return ret
@@ -266,20 +263,16 @@ def getProbableSelections(resources_avail, iteration, resources_found_by_gossip,
             A random choice based on the distribution calculated by normalized scores
     """
     if mode == 'distance_based':
-        unnormalized_scores = np.array(
-            [getScoreByDistance(e.values()[0]) * getScoreByIterationsSpent(iteration) for e in resources_avail],
-            dtype=float)
-        normalised_scores = unnormalized_scores / np.sum(unnormalized_scores)
-        return np.random.choice([e.keys()[0] for e in resources_avail], p=normalised_scores)
+        unnormalized_scores_dict = {
+            element_.keys()[0]: getScoreByDistance(element_.values()[0]) * getScoreByIterationsSpent(iteration)
+            for element_ in resources_avail}
     else:
-        resource_ids_in_view = list(set([e.keys()[0] for e in resources_avail] + resources_found_by_gossip.keys()))
-        resources_and_scores = {}
-        for res_id, scores_dict in resources_found_by_gossip.iteritems():
-            if res_id not in resource_ids_in_view:
-                resources_and_scores[res_id] = scores_dict['distance_based_score']*scores_dict['iteration_based_score']*scores_dict['gossip_based_score']
-            else:
-                resources_and_scores[res_id] = scores_dict['distance_based_score']*scores_dict['iteration_based_score']*scores_dict['gossip_based_score']
-                pass
+        unnormalized_scores_dict = {
+            res_id: score_dict['distance_based_score'] * score_dict['iteration_based_score'] * score_dict[
+                'gossip_based_score']
+            for res_id, score_dict in resources_found_by_gossip.iteritems()}
+    normalised_scores = np.array(unnormalized_scores_dict.values()) / np.sum(unnormalized_scores_dict.values())
+    return np.random.choice(unnormalized_scores_dict.keys(), p=normalised_scores)
 
 
 def main(number_of_resources=4, number_of_particles=10):
