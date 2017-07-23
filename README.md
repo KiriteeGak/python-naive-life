@@ -1,2 +1,2 @@
 # python-naive-life
-An attempt to create a particle swarm intelligence for resource finding an optimisatation
+An attempt for creating/visualising the settling of particle swarms for resources based on messaging based optimisation
