@@ -1,15 +1,14 @@
 import random as rd
-from matplotlib import pyplot as plt
-from itertools import *
 from requests.models import *
 from commons import *
+import particleProperties
 
 MAX_GRID_DISTANCE = np.sqrt(2)
 
 
 class ConstValueGenerators:
     @staticmethod
-    def generateResourceCoordinates(number_of_resources=1):
+    def generate_resource_coordinates(number_of_resources=1):
         """
             :argument
                 number_of_resources (Int) : Number of resources to be generated on the map
@@ -23,7 +22,7 @@ class ConstValueGenerators:
             raise TypeError("Number of resources should be of integer format")
 
     @staticmethod
-    def generateCoordinates(number_of_particles=1, factor=1):
+    def generate_particle_coordinates(number_of_particles=1, factor=1):
         """
             :argument
                 number_of_particles (Int) : Number of coordinates to be generated for the particles
@@ -38,7 +37,7 @@ class ConstValueGenerators:
                 range(number_of_particles)}
 
     @staticmethod
-    def generateVelocityVectors(number_of_particles=1, factor=0.5):
+    def generate_velocity_vectors(number_of_particles=1, factor=0.5):
         """
             :argument
                 number_of_particles (Int) : Number of velocity vectors to be generated for the particles
@@ -51,7 +50,7 @@ class ConstValueGenerators:
 
 
 class IterationValueGenerators:
-    def getNextTimeStepCoordinates(self, coordinate_vectors, velocity_vectors):
+    def get_next_positions(self, coordinate_vectors, velocity_vectors):
         """
             :argument
                 coordinate_vectors (dict) : Map of particle ids and coordinates
@@ -59,12 +58,12 @@ class IterationValueGenerators:
             :returns
                 (dict) : Map of particle ids and velocity for the next time step
         """
-        return {_ + 1: mod_vel for _, mod_vel in enumerate(self._tackleOverTheGridCoords(
-            [self._createMutation(list(np.array(c) + np.array(v))) for c, v in
+        return {_ + 1: mod_vel for _, mod_vel in enumerate(self._tackle_beyond_map_positions(
+            [self._create_positional_mutation(list(np.array(c) + np.array(v))) for c, v in
              zip(coordinate_vectors.values(), velocity_vectors.values())]))}
 
     @staticmethod
-    def remakeVelocityVectors(settlers, velocity_vectors):
+    def remake_velocity_vectors(settlers, velocity_vectors):
         """
             :argument
                 settlers (dict) : Map of particles that are settlers for a resource
@@ -76,7 +75,7 @@ class IterationValueGenerators:
                 velocity_vectors.iteritems()}
 
     @staticmethod
-    def _createMutation(coordinates, odds=None):
+    def _create_positional_mutation(coordinates, odds=None):
         """
             :argument
                 coordinates (List) : List of coordinates for all the particles
@@ -93,7 +92,7 @@ class IterationValueGenerators:
             return coordinates
 
     @staticmethod
-    def _tackleOverTheGridCoords(list_of_coords):
+    def _tackle_beyond_map_positions(list_of_coords):
         """
             :argument :
                 list_of_coords (List) : List of coordinates
@@ -104,7 +103,7 @@ class IterationValueGenerators:
                 list_of_coords]
 
 
-def searchOrGetMessage(settlers, current_locations, resource_locations, iteration, radius=0.02):
+def _resource_search(settlers, current_locations, resource_locations, iteration, radius=0.02):
     """
         :argument
             settlers (dict) : Map of particle ids and the resources they got settled to, if any
@@ -115,14 +114,14 @@ def searchOrGetMessage(settlers, current_locations, resource_locations, iteratio
         :returns
             NEED SOME SEEING
     """
-    resources_in_view = searchForResourceAround(current_locations, resource_locations, radius)
-    resources_found_by_gossip = getResourcesByGossip(iteration, settlers, 0.05, resource_locations,
-                                                     current_locations)
-    settlers = settleParticlesDown(settlers, iteration, resources_in_view, resources_found_by_gossip)
+    resources_in_view = _view_based_search(current_locations, resource_locations, radius)
+    resources_found_by_gossip = _get_resources_by_gossip(iteration, settlers, 0.05, resource_locations,
+                                                         current_locations)
+    settlers = _resource_particle_allocator(settlers, iteration, resources_in_view, resources_found_by_gossip)
     return settlers
 
 
-def searchForResourceAround(current_locations, resource_locations, radius=0.2):
+def _view_based_search(current_locations, resource_locations, radius=0.2):
     """
         :argument
             current_locations (dict) : Map of current locations of all the particles
@@ -144,22 +143,7 @@ def searchForResourceAround(current_locations, resource_locations, radius=0.2):
     return found_locations_by_distance
 
 
-def getCombinedScore(iteration, dist, msgs_received, factor='exp'):
-    """
-        :argument
-            iteration (Int) : Iteration the system currently in
-            dist (Int) : distance between particle and resource
-            msgs_received : the number of particles the are settled to this
-            factor (default : str; int): tune in for the probability of selection of source based on the msgs_received
-        :returns
-            (float) : Combined score for preference of resource
-    """
-    return round(
-        getScoreByIterationsSpent(iteration) / (getScoreByDistance(dist) + getScoreBySignals(msgs_received,
-                                                                                             factor)), 3)
-
-
-def getScoreByIterationsSpent(iteration, modifier=0.5):
+def _score_by_iterations(iteration, modifier=0.5):
     """
         :argument
             iteration (int) : Iteration the system currently in
@@ -167,20 +151,20 @@ def getScoreByIterationsSpent(iteration, modifier=0.5):
         :returns
             (float) : score based on iteration
     """
-    return round(float(iteration / (modifier + iteration)), 3)
+    return round(float(iteration / (modifier + iteration)), 5)
 
 
-def getScoreByDistance(dist):
+def _score_by_resource_particle_distance(dist):
     """
         :argument
             dist (Int) : distance between particle and resource
         :returns
             (float) : Score based on distance
     """
-    return round(MAX_GRID_DISTANCE / (dist + MAX_GRID_DISTANCE), 3)
+    return round(MAX_GRID_DISTANCE / (dist + MAX_GRID_DISTANCE), 5)
 
 
-def getScoreBySignals(msgs_received, factor=None):
+def _score_by_messages_received(msgs_received, factor=None):
     """
         :argument
             msgs_received : the number of particles the are settled to this
@@ -191,14 +175,14 @@ def getScoreBySignals(msgs_received, factor=None):
     if factor:
         assert (type(factor) in [str, float, int]), "Factor should be of format int,float or by default a string"
     if not factor:
-        return round(1 - (1 / np.exp(msgs_received)), 4)
+        return round(1 - (1 / np.exp(msgs_received)), 5)
     elif factor > 1:
-        return round(1 - (1 / factor ** msgs_received), 4)
+        return round(1 - (1 / factor ** msgs_received), 5)
     else:
         raise ValueError("Factor should be greater than one for ideal selection")
 
 
-def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_locations, particle_locations):
+def _get_resources_by_gossip(iteration, settlers, max_gossip_distance, resource_locations, particle_locations):
     """
         :argument
             iteration (Int) : Current generation the system is in
@@ -224,14 +208,14 @@ def getResourcesByGossip(iteration, settlers, max_gossip_distance, resource_loca
                 msgs_received = len(res_to_particles_settled_match.get(source, []))
                 if msgs_received != 0 and dist <= max_gossip_distance:
                     ret[particle][source] = {
-                        'iteration_based_score': getScoreByIterationsSpent(iteration),
-                        'distance_based_score': getScoreByDistance(dist),
-                        'gossip_based_score': getScoreBySignals(msgs_received)
+                        'iteration_based_score': _score_by_iterations(iteration),
+                        'distance_based_score': _score_by_resource_particle_distance(dist),
+                        'gossip_based_score': _score_by_messages_received(msgs_received)
                     }
     return ret
 
 
-def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
+def _resource_particle_allocator(settlers, iteration, view_radius_based, gossip_based):
     """
     :argument
         settlers : (dict) A map of settled particles to the resource it got settled to
@@ -245,14 +229,14 @@ def settleParticlesDown(settlers, iteration, view_radius_based, gossip_based):
     for particle_id, resource_avail in view_radius_based.iteritems():
         if particle_id not in settlers:
             if len(gossip_based[particle_id]) == 0:
-                ret[particle_id] = getProbableSelections(resource_avail, iteration, None, mode='distance_based')
+                ret[particle_id] = _selection_by_distribution(resource_avail, iteration, None, mode='distance_based')
             else:
-                ret[particle_id] = getProbableSelections(resource_avail, iteration, gossip_based[particle_id],
-                                                         mode='message_based')
+                ret[particle_id] = _selection_by_distribution(resource_avail, iteration, gossip_based[particle_id],
+                                                              mode='message_based')
     return ret
 
 
-def getProbableSelections(resources_avail, iteration, resources_found_by_gossip, mode):
+def _selection_by_distribution(resources_avail, iteration, resources_found_by_gossip, mode):
     """
         :argument
             resources_avail (dict) :
@@ -264,7 +248,8 @@ def getProbableSelections(resources_avail, iteration, resources_found_by_gossip,
     """
     if mode == 'distance_based':
         unnormalized_scores_dict = {
-            element_.keys()[0]: getScoreByDistance(element_.values()[0]) * getScoreByIterationsSpent(iteration)
+            element_.keys()[0]: _score_by_resource_particle_distance(element_.values()[0]) * _score_by_iterations(
+                iteration)
             for element_ in resources_avail}
     else:
         unnormalized_scores_dict = {
@@ -275,6 +260,18 @@ def getProbableSelections(resources_avail, iteration, resources_found_by_gossip,
     return np.random.choice(unnormalized_scores_dict.keys(), p=normalised_scores)
 
 
+def return_particle_properties(positions, velocities):
+    """
+    :argument
+        positions: Positions given to initialise particles
+        velocities: Velocities initialised for the particles
+    :returns
+        Map of particles to particle default attributes fer helping in describing the current state of particle
+    """
+    return {particle_id: particleProperties.ParticleProps(position, velocities[particle_id], [], [], False, False, True)
+            for particle_id, position in positions.iteritems()}
+
+
 def main(number_of_resources=4, number_of_particles=10):
     """Main function that runs simulations
         :argument
@@ -282,15 +279,16 @@ def main(number_of_resources=4, number_of_particles=10):
             number_of_particles: (int) Number of particles to be generated on the grid
     """
     iterations = 1
-    resource_vectors = ConstValueGenerators.generateResourceCoordinates(number_of_resources)
-    coordinate_vectors = ConstValueGenerators.generateCoordinates(number_of_particles)
-    velocity_vectors = ConstValueGenerators.generateVelocityVectors(number_of_particles)
+    resource_vectors = ConstValueGenerators.generate_resource_coordinates(number_of_resources)
+    coordinate_vectors = ConstValueGenerators.generate_particle_coordinates(number_of_particles)
+    velocity_vectors = ConstValueGenerators.generate_velocity_vectors(number_of_particles)
+    props = return_particle_properties(coordinate_vectors, velocity_vectors)
     settlers = {}
     while iterations <= 10:
-        # plotPoints(resource_vectors.values(), coordinate_vectors.values())
-        settlers = searchOrGetMessage(settlers, coordinate_vectors, resource_vectors, iterations)
-        velocity_vectors = IterationValueGenerators.remakeVelocityVectors(settlers, velocity_vectors)
-        coordinate_vectors = IterationValueGenerators().getNextTimeStepCoordinates(coordinate_vectors, velocity_vectors)
+        plot_points(resource_vectors.values(), coordinate_vectors.values())
+        settlers = _resource_search(settlers, coordinate_vectors, resource_vectors, iterations)
+        velocity_vectors = IterationValueGenerators.remake_velocity_vectors(settlers, velocity_vectors)
+        coordinate_vectors = IterationValueGenerators().get_next_positions(coordinate_vectors, velocity_vectors)
         iterations += 1
 
 
